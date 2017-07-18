@@ -1,0 +1,22 @@
+Propagazione "Authorization Bearer xyz" attraverso services graph.
+
+1) Prendo un bearer token con una POST http://localhost:8083/auth/oauth/token con:
+
+a)Header:  "Authorization Basic ZWFnbGVleWU6dGhpc2lzc2VjcmV0"
+b)Payload:  grant_type=password&scope=webclient&username=john.carnell&password=password1
+
+2) Invoco  http://localhost:5555/licensingservice/v1/organizations/e254f8c-c442-4ebe-a82a-e2fc1d1ff78a/licenses/f3831f8c-c338-4ebe-a82a-e2fc1d1ff78a
+	passando header "Authorization Berarer xyz" ottenuto punto 1
+
+
+3)licensingservice invoca organization service usando OAuth2RestTemplate in OrganizationRestTemplateClient.getOrganization(String organizationId)
+	OAuth2RestTemplate e' definito in Application.java e prende L header "Authorization Bearer ..." dalla request e lo propaga in tutte le requests che ne derivano.
+	
+	L aggiunta dell header e' in DefaultOAuth2RequestAuthenticator.authenticate().
+	
+
+
+
+
+
+

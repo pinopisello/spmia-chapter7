@@ -1,0 +1,41 @@
+@EnableResourceServer  @Import(ResourceServerConfiguration.class)
+
+
+ ResourceServerConfiguration extends WebSecurityConfigurerAdapter
+ 
+ 
+ #######################    ResourceServerConfiguration   #########################
+ 
+ ResourceServerConfiguration.setConfigurers() riceve instanza com.thoughtmechanix.organization.security.ResourceServerConfiguration
+ che configura la protezione endpoints esposti.
+ 
+ 
+ 
+#######################    WebSecurityConfigurerAdapter   #########################
+ 
+ WebSecurityConfigurerAdapter.setObjectPostProcessor() riceve istanza org.springframework.security.config.annotation.configuration.AutowireBeanFactoryObjectPostProcessor
+ AutowireBeanFactoryObjectPostProcessor e' usato per costruire WebSecurityConfigurerAdapter.authenticationBuilder e WebSecurityConfigurerAdapter.localConfigureAuthenticationBldr
+ 
+ WebSecurityConfigurerAdapter.authenticationConfiguration => AuthenticationConfiguration
+ 
+ 
+ 
+ 
+ 
+    
+#######################    AuthenticationConfiguration   #########################
+ WebSecurityConfigurerAdapter.setAuthenticationConfiguration() riceve istanza  AuthenticationConfiguration.
+ 
+AuthenticationConfiguration definisce tramite factory method seguenti beans:
+
+AuthenticationManagerBuilder                   => authenticationManagerBuilder()
+
+EnableGlobalAuthenticationAutowiredConfigurer  => enableGlobalAuthenticationAutowiredConfigurer()
+
+InitializeUserDetailsBeanManagerConfigurer     => initializeUserDetailsBeanManagerConfigurer()
+
+InitializeAuthenticationProviderBeanManagerConfigurer => initializeAuthenticationProviderBeanManagerConfigurer()
+ 
+
+
+

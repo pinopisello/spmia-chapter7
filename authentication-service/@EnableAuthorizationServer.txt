@@ -1,0 +1,17 @@
+Application.java e' annotata @EnableAuthorizationServer
+
+@EnableAuthorizationServer 
+@Import({AuthorizationServerEndpointsConfiguration.class, AuthorizationServerSecurityConfiguration.class})
+
+
+#############   AuthorizationServerEndpointsConfiguration   ############
+Non ancora esplorato
+
+
+
+
+
+###########    AuthorizationServerSecurityConfiguration   ##############
+Non ancora esplorato
+
+

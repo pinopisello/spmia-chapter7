@@ -1,0 +1,112 @@
+Implementa Oauth2 server tramite Application che e' allo stesso tempo @SpringBootApplication e @RestController
+
+
+
+Le cose da fare sono:
+
+1)Aggiungere Oauth2 dependencies nel pom
+spring-cloud-security
+spring-security-oauth2
+  
+2)Annotare @EnableAuthorizationServer e @RestController la bootstrap class Application.java
+
+3)Configurare application.yml
+	server:           #starta sever su porta 8083
+	  port: 8083
+  server:             #setta base context a /auth invece che /
+  contextPath:   /auth
+
+Tutto qua!!
+
+
+
+
+################    http://localhost:8083/auth/oauth/token   ##########
+
+Usa ARC per eseguire una POST verso http://localhost:8083/auth/oauth/token passando :
+
+1)Authorization header settato con basic auth con user = eagleeye e pwd = thisissecret [vedi OAuth2Config]
+
+2)Form paramaters: [vedi WebSecurityConfigurer e OAuth2Config]
+
+grant_type=password
+scope=webclient
+username=john.carnell
+password=password1
+
+La response e' un json contenente:
+
+{
+"access_token": "a67652c0-a848-493a-88d7-b8a6d1951f62",
+"token_type": "bearer",
+"refresh_token": "391836d1-91f7-48f2-886a-615910409154",
+"expires_in": 43181,
+"scope": "webclient"
+}
+
+access_token sara usato dal client per autenticarsi con la "protected resource".
+
+
+
+DispatcherServlet.doDispatch() =>  TokenEndpoint.postAccessToken() =>  clientId = TokenEndpoint.getClientId(principal); [clientId=eagleeye , estratto dall header 'Authorization']
+																	   authenticatedClient = InMemoryClientDetailsService.loadClientByClientId('eagleeye');
+																	   tokenRequest = DefaultOAuth2RequestFactory.createTokenRequest()
+																	   oAuth2AccessToken = AuthorizationServerEndpointsConfigurer.TokenGranter.grant(tokenRequest) => CompositeTokenGranter.grant(tokenRequest) => ResourceOwnerPasswordTokenGranter.grant(tokenRequest) => baseClientDetails = InMemoryClientDetailsService.loadClientByClientId('eagleeye') 
+																	      																																																    OAuth2AccessToken = ResourceOwnerPasswordTokenGranter.getAccessToken(baseClientDetails,tokenRequest) =>     oAuth2Authentication = ResourceOwnerPasswordTokenGranter.getOAuth2Authentication(baseClientDetails,tokenRequest)
+																	      																																																    																											oAuth2AccessToken = DefaultTokenServices.createAccessToken(oAuth2Authentication) => accessToken = InMemoryTokenStore.getAccessToken(oAuth2Authentication) => key = DefaultAuthenticationKeyGenerator.extractKey(authentication)
+																	      																																																    																																																														   OAuth2AccessToken accessToken = authenticationToAccessTokenStore.get(key);
+																	      																																																    																																																														   return 	accessToken
+																	      																																																    																											return  oAuth2AccessToken															InMemoryTokenStore.storeAccessToken(existingAccessToken, oAuth2Authentication);
+																	   																																																		return OAuth2AccessToken          
+
+        															  TokenEndpoint.getResponse(oAuth2AccessToken)  [risposta inviata al client con oAuth2AccessToken nel body in json]
+
+Il client che vuole invocare una risorsa protetta da OAuth dovra' includere tale token come Authorization header nella request.
+Vedi applicatio.yml "security:oauth2:"  e @EnableResourceServer in Application.java in licensing-service_chapter7 e organization-service_chapter7
+
+################    http://localhost:8083/auth/user   ##########
+
+Una volta che si ha un token, si puo fare una GET verso http://localhost:8083/auth/user  per ripescare info sul matching user.
+Occorre aggiungere un  header:   Authorization = Bearer "access_token"
+
+/auth/user e' mappato in Application.user(OAuth2Authentication).
+
+
+DispatcherServlet.doDispatch() => Application.user(OAuth2Authentication) => OAuth2Authentication.getUserAuthentication().getPrincipal())  => "user"        vengono mappati in una Map  e ritornati al client
+																		    OAuth2Authentication.getUserAuthentication().getAuthorities() => "authorities"
+
+
+
+Come e' OAuth2Authentication ottenuto?Attraverso OAuth2AuthenticationProcessingFilter:
+
+OAuth2AuthenticationProcessingFilter.doFilter(req,res) => PreAuthenticatedAuthenticationToken authentication = BearerTokenExtractor.extract(request) => String tokenValue = BearerTokenExtractor.extractToken(req) => String token = extractHeaderToken(request);
+																						  return  new PreAuthenticatedAuthenticationToken(tokenValue, "");
+														  
+														  request.setAttribute(".ACCESS_TOKEN_VALUE", authentication.getPrincipal());
+														  authentication.setDetails(OAuth2AuthenticationDetailsSource.buildDetails(request)) => return new OAuth2AuthenticationDetails(request)   OAuth2AuthenticationDetails contiene il token ricevuto, il tipo token, ip sender ,etc
+								                          OAuth2Authentication authResult = OAuth2AuthenticationManager.authenticate(authentication) =>   String token = (String) authentication.getPrincipal() e' il bearer token inviato client
+										                          																						  OAuth2Authentication auth = DefaultTokenServices.loadAuthentication(token)               =>  OAuth2AccessToken accessToken = InMemoryTokenStore.readAccessToken(token) =>         InMemoryTokenStore.accessTokenStore     e' una Map che store (token/DefaultOAuth2AccessToken)
+																																						  return auth	Questo e' l oggetto passato a	Application.user(OAuth2Authentication user) !!!																	   OAuth2Authentication result = InMemoryTokenStore.readAuthentication(accessToken) =>  InMemoryTokenStore.authenticationStore  e' una Map che store (token/OAuth2Authentication)
+														  DefaultAuthenticationEventPublisher.publishAuthenticationSuccess(authResult);
+														  SecurityContextHolder.getContext().setAuthentication(authResult);  => SecurityContextImpl.setAuthentication(authResult)  Quindi OAuth2Authentication e' ora storato in SecurityContextImpl.authentication!!
+														  
+														  
+Request procede	verso DispatcherServlet...												  								  
+
+DispatcherServlet.doDispatch() => RequestMappingHandlerAdapter.handleInternal(request,response,handlerMethod) => ... => ServletRequestMethodArgumentResolver.resolveArgument(MethodParameter parameter,..,NativeWebRequest webRequest) => Class<?> paramType = parameter.getParameterType() e' OAuth2Authentication che implements Principal!!
+																																																										  SecurityContextHolderAwareRequestWrapper request = webRequest.getNativeRequest(HttpServletRequest.class);
+																																																										  if (Principal.class.isAssignableFrom(paramType)) return request.getUserPrincipal() => SecurityContextHolderAwareRequestWrapper.getUserPrincipal() => SecurityContextHolderAwareRequestWrapper.getAuthentication() => Authentication auth = SecurityContextImpl.getAuthentication()  
+		
+
+Tadaaa. Ripescato SecurityContextImpl.authentication settato da OAuth2AuthenticationProcessingFilter!!
+ 
+ 
+ 
+
+
+
+
+
+
+
+
