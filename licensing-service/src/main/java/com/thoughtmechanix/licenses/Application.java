@@ -32,12 +32,14 @@ public class Application {
 
     private static final Logger logger = LoggerFactory.getLogger(Application.class);
 
+    @LoadBalanced
     @Bean
     public OAuth2RestTemplate oauth2RestTemplate(OAuth2ClientContext oauth2ClientContext,
                                                  OAuth2ProtectedResourceDetails details) {
         return new OAuth2RestTemplate(details, oauth2ClientContext);
     }
 
+   
 //    @Primary
 //    @Bean
 //    public RestTemplate getCustomRestTemplate() {

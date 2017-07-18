@@ -15,6 +15,7 @@ import org.springframework.web.client.RestTemplate;
 public class OrganizationRestTemplateClient {
     @Autowired
     OAuth2RestTemplate restTemplate;
+    
 
     private static final Logger logger = LoggerFactory.getLogger(OrganizationRestTemplateClient.class);
 
@@ -23,7 +24,7 @@ public class OrganizationRestTemplateClient {
 
         ResponseEntity<Organization> restExchange =
                 restTemplate.exchange(
-                        "http://zuulserver:5555/api/organization/v1/organizations/{organizationId}",
+                        "http://zuulservice/organizationservice/v1/organizations/{organizationId}",
                         HttpMethod.GET,
                         null, Organization.class, organizationId);
 

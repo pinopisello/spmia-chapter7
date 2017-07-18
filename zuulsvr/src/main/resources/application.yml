@@ -3,7 +3,7 @@ spring:
     name: zuulservice
   profiles:
     active:
-      default
+      prod
   cloud:
     config:
       enabled: true
