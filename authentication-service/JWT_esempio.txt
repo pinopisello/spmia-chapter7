@@ -1,1 +1,6 @@
-Switcha al branch "JWT_Example"
+Switcha al branch "JWT_Example" per esempio OAuth2 token che e':
+
+1)criptato
+2)signed da OAuth server
+3)contiene tutti dati user cosi i services non devono chiamare OAuth server ogni volta, basta che verifichino 
+  signature token e decriptino il token per estrarre i contenuti.
