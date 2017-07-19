@@ -37,13 +37,13 @@ public class JWTOAuth2Config extends AuthorizationServerConfigurerAdapter {
     private TokenEnhancer jwtTokenEnhancer;
 
 
-
+    //Connette , hooka OAuth server a JWT.Iniietta jwtAccessTokenConverter e jwtTokenEnhancer definiti in JWTTokenStoreConfig.java
     @Override
     public void configure(AuthorizationServerEndpointsConfigurer endpoints) throws Exception {
         TokenEnhancerChain tokenEnhancerChain = new TokenEnhancerChain();
         tokenEnhancerChain.setTokenEnhancers(Arrays.asList(jwtTokenEnhancer, jwtAccessTokenConverter));
 
-        endpoints.tokenStore(tokenStore)                             //JWT
+        endpoints.tokenStore(tokenStore)                             //JWT  
                 .accessTokenConverter(jwtAccessTokenConverter)       //JWT
                 .tokenEnhancer(tokenEnhancerChain)                   //JWT
                 .authenticationManager(authenticationManager)

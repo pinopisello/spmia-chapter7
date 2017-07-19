@@ -22,6 +22,8 @@ public class JWTTokenStoreConfig {
         return new JwtTokenStore(jwtAccessTokenConverter());
     }
 
+    
+    //DefaultTokenServices legge/scrive dati nei tokens da e verso OAuth server
     @Bean
     @Primary
     public DefaultTokenServices tokenServices() {
@@ -31,7 +33,9 @@ public class JWTTokenStoreConfig {
         return defaultTokenServices;
     }
 
-
+    //JwtAccessTokenConverter  interprete tra OAuth e JWT.
+    //Setta la Key usata per criptare tokens [signing.key in authenticationservice-prod.yml]
+    //Chiave simmetrica va sharata tra services e OAUth, ergo rischioso...
     @Bean
     public JwtAccessTokenConverter jwtAccessTokenConverter() {
         JwtAccessTokenConverter converter = new JwtAccessTokenConverter();

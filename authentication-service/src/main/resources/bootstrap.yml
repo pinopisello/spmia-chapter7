@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: authenticationservice
+  datasource:
+    initialize: false   #runna schema.sql ad ogni boostrap    
+  profiles:
+    active:
+      prod
+  cloud:
+    config:
+      uri: http://localhost:8888
+      enabled: true 
+server:
+  contextPath:   /auth
+  port: 8083

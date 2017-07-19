@@ -4,10 +4,23 @@ OAuut2 server ma che genera JWT tokens invece che Bearer ones.
 
 2) com.thoughtmechanix.authentication.security si hanno 4 classi che configurano il server:
 
-a)
-b)
-c)
-d)
+a)JWTOAuth2Config.java
+   Configura users,grants ,etc di OAuth.
+   configure(AuthorizationServerEndpointsConfigurer endpoints)  =>  Connette , hooka OAuth server a JWT.Iniietta jwtAccessTokenConverter e jwtTokenEnhancer definiti in JWTTokenStoreConfig.java
+ 
+   configure(ClientDetailsServiceConfigurer clients) => setta usr/pwd per basic auth clients che ottengono token, oltre che usr/pwd/grants/scopes degli users definiti per appilcation
+   
+   
+   
+b)JWTTokenEnhancer.java
+c)JWTTokenStoreConfig.java    Creazione,signing e translation di token jwt.  
+  Definisce :
+  			  DefaultTokenServices     legge/scrive dati nei tokens da e verso OAuth server
+              JwtAccessTokenConverter  interprete tra OAuth e JWT.Setta la Key usata per criptare tokens [signing.key in authenticationservice-prod.yml]
+              JWTTokenEnhancer         non so ...
+              
+              
+d)WebSecurityConfigurer.java
 
 
 
