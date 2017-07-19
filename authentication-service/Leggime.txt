@@ -1,0 +1,15 @@
+OAuut2 server ma che genera JWT tokens invece che Bearer ones.
+
+1) Aggiunta  <artifactId>spring-security-jwt</artifactId> in pom.xml
+
+2) com.thoughtmechanix.authentication.security si hanno 4 classi che configurano il server:
+
+a)
+b)
+c)
+d)
+
+
+
+
+
