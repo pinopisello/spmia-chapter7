@@ -8,21 +8,112 @@ a)JWTOAuth2Config.java
    Configura users,grants ,etc di OAuth.
    configure(AuthorizationServerEndpointsConfigurer endpoints)  =>  Connette , hooka OAuth server a JWT.Iniietta jwtAccessTokenConverter e jwtTokenEnhancer definiti in JWTTokenStoreConfig.java
  
-   configure(ClientDetailsServiceConfigurer clients) => setta usr/pwd per basic auth clients che ottengono token, oltre che usr/pwd/grants/scopes degli users definiti per appilcation
+   configure(ClientDetailsServiceConfigurer clients) => setta usr/pwd per basic auth clients che ottengono token, oltre che granttypes ["refresh_token", "password", "client_credentials"] e 
+    e scopes ["webclient", "mobileclient"]
    
    
-   
-b)JWTTokenEnhancer.java
+b)JWTTokenEnhancer.java     aggiunge field "organizationId" nella response
+
 c)JWTTokenStoreConfig.java    Creazione,signing e translation di token jwt.  
   Definisce :
   			  DefaultTokenServices     legge/scrive dati nei tokens da e verso OAuth server
-              JwtAccessTokenConverter  interprete tra OAuth e JWT.Setta la Key usata per criptare tokens [signing.key in authenticationservice-prod.yml]
-              JWTTokenEnhancer         non so ...
+              JwtAccessTokenConverter  interprete tra OAuth e JWT.Setta la Key usata per criptare tokens [signing.key in authenticationservice-prod.yml].Setta (riempie e segna secondo standard jwt) il valore di "access_token" nella response.
+              JWTTokenEnhancer         definisce in Spring bean definito in  JWTTokenEnhancer.java 
               
               
-d)WebSecurityConfigurer.java
+d)WebSecurityConfigurer.java 
+    configure(AuthenticationManagerBuilder auth) setta usr/pwd/roles degli users definiti per appilcation
+ 
+   
 
 
+
+################    http://localhost:8083/auth/oauth/token   ##########
+
+Usa ARC per eseguire una POST verso http://localhost:8083/auth/oauth/token passando :
+
+1)Authorization header settato con basic auth con user = eagleeye e pwd = thisissecret [vedi OAuth2Config]
+  Authorization: Basic ZWFnbGVleWU6dGhpc2lzc2VjcmV0
+
+2)Form paramaters: [vedi WebSecurityConfigurer e OAuth2Config]
+
+grant_type=password
+scope=webclient
+username=john.carnell
+password=password1
+
+La response e' un json contenente:
+
+{
+"access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcmdhbml6YXRpb25JZCI6ImQxODU5ZjFmLTRiZDctNDU5My04NjU0LWVhNmQ5YTZhNjI2ZSIsInVzZXJfbmFtZSI6ImpvaG4uY2FybmVsbCIsInNjb3BlIjpbIndlYmNsaWVudCJdLCJleHAiOjE1MDA1NDEwODksImF1dGhvcml0aWVzIjpbIlJPTEVfVVNFUiJdLCJqdGkiOiI5ZDMxYjU4OC1hNTlkLTQ1ZTMtOGU3MS1lM2ZmMjdjMjNhYmEiLCJjbGllbnRfaWQiOiJlYWdsZWV5ZSJ9.95Co1i54J_QYybExFmxvJcRpNxPRChpamSgEm83g2H4",
+"token_type": "bearer",
+"refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcmdhbml6YXRpb25JZCI6ImQxODU5ZjFmLTRiZDctNDU5My04NjU0LWVhNmQ5YTZhNjI2ZSIsInVzZXJfbmFtZSI6ImpvaG4uY2FybmVsbCIsInNjb3BlIjpbIndlYmNsaWVudCJdLCJhdGkiOiI5ZDMxYjU4OC1hNTlkLTQ1ZTMtOGU3MS1lM2ZmMjdjMjNhYmEiLCJleHAiOjE1MDMwODk4ODksImF1dGhvcml0aWVzIjpbIlJPTEVfVVNFUiJdLCJqdGkiOiJmMDk2ZGMzYi1kMzBhLTQxZTktYTJhYi02Y2U1ODc2N2UwMmYiLCJjbGllbnRfaWQiOiJlYWdsZWV5ZSJ9.ltUB8B3hNhH-_plauzvRBar4DFUYGXXdt34NLkL4WSg",
+"expires_in": 43199,
+"scope": "webclient",
+"organizationId": "d1859f1f-4bd7-4593-8654-ea6d9a6a626e",
+"jti": "9d31b588-a59d-45e3-8e71-e3ff27c23aba"
+}
+
+access_token sara usato dal client per autenticarsi con la "protected resource".
+
+Per estrarre il contenuto access_token usa https://www.jsonwebtoken.io/.
+
+
+In breve:  Client usr/pwd (basic auth) sono storati in InMemoryClientDetailsService.clientDetailsStore by usr
+           User/pwd/roles/etc sono storati in InMemoryUserDetailsManager.users by usr
+           Il valore JwT di access_token e' settato da JwtAccessTokenConverter.enhance(tokens, authentication)
+
+DispatcherServlet.doDispatch() =>  TokenEndpoint.postAccessToken() =>  String clientId = TokenEndpoint.getClientId(principal); [clientId=eagleeye , estratto dall header 'Authorization']
+																	   authenticatedClient = InMemoryClientDetailsService.loadClientByClientId('eagleeye');
+																	   TokenRequest tokenRequest = DefaultOAuth2RequestFactory.createTokenRequest(authenticatedClient)
+																	   OAuth2AccessToken oAuth2AccessToken = AuthorizationServerEndpointsConfigurer.tokenGranter().grant("password",tokenRequest) => CompositeTokenGranter.grant(tokenRequest) => ResourceOwnerPasswordTokenGranter.grant(tokenRequest) =>      String clientId = tokenRequest.getClientId();
+																										   																																																		BaseClientDetails baseClientDetails = InMemoryClientDetailsService.loadClientByClientId('eagleeye') =>    'eagleeye' viene dall header Authorization: Basic ZWFnbGVleWU6dGhpc2lzc2VjcmV0 della req. 
+																										   																																																																												  return InMemoryClientDetailsService.loadClientByClientId("eagleeye") => retruns InMemoryClientDetailsService.clientDetailsStore.get(clientId) InMemoryClientDetailsService contiene una Map con tutti i clients riconosciuti by client id
+																										      																																																    OAuth2AccessToken = AbstractTokenGranter.getAccessToken(baseClientDetails,tokenRequest) =>             OAuth2Authentication oAuth2Authentication = ResourceOwnerPasswordTokenGranter.getOAuth2Authentication(baseClientDetails,tokenRequest) => Map<String, String> parameters = new LinkedHashMap<String, String>(tokenRequest.getRequestParameters());
+																										      																																																    																																																											   String username = parameters.get("username");   "john.carnell" Qui riescono fuori usr/pwd a cui voglio assegnare oauth token
+																										      																																																    																																																											   String password = parameters.get("password");
+																										      																																																    																																																											   Authentication userAuth = new UsernamePasswordAuthenticationToken(username, password); 
+																										      																																																    																																																											   userAuth = WebSecurityConfigurerAdapter$AuthenticationManagerDelegator.authenticate(userAuth) => return ProviderManager.authenticate(userAuth)=> DaoAuthenticationProvider.authenticate(userAuth) => String username =  authentication.getName() "john.carnell"
+																										      																																																    																																																											   																																																	    UserDetails user = retrieveUser(username,userAuth) => return InMemoryUserDetailsManager.loadUserByUsername(username) => return InMemoryUserDetailsManager.users.get(username.toLowerCase())
+																										      																																																    																																																											   																																																	    return DaoAuthenticationProvider.createSuccessAuthentication(user, userAuth, user) => UsernamePasswordAuthenticationToken result = new UsernamePasswordAuthenticationToken(user, userAuth.getCredentials())
+																										      																																																    																																																											   																																																	    																					   result.setDetails(authentication.getDetails());
+																										      																																																    																																																											   																																																	    																					   return result
+																										      																																																    																																																											   OAuth2Request storedOAuth2Request = 	DefaultOAuth2RequestFactory.createOAuth2Request(baseClientDetails,tokenRequest) => TokenRequest.createOAuth2Request(baseClientDetails) => return new OAuth2Request(requestParameters, baseClientDetails.getClientId(), baseClientDetails.getAuthorities(), true, this.getScope(),client.getResourceIds(), null, null, null);  this.scope = "webclient" che e; passato nella POST																																   																																																	    																					   
+																										      																																																    																																																											   return new OAuth2Authentication(storedOAuth2Request, userAuth);																																																	    																					   
+																										      																																																   return  OAuth2AccessToken																																																									   																																																	    																					   
+																	  TokenEndpoint.getResponse(oAuth2AccessToken) => 		oAuth2AccessToken contiene value,refreshToken,tokenType, etc ritornati al caller ...				      																																																    
+																										      																																																    
+																						      																																																    																											          return DefaultTokenServices.createAccessToken(oAuth2Authentication) =>OAuth2RefreshToken refreshToken = DefaultTokenServices.createRefreshToken(authentication)
+oAuth2AccessToken ritornato contiene tutti i dettagli del usr, inclusi i roles.
+I microservices possono aprirlo, leggere info di cui hanno bisogno e validate la provevienza dato che e' signed con una simmetric key.																						      																																																    																											          																		OAuth2AccessToken accessToken = createAccessToken(authentication, refreshToken)=> DefaultOAuth2AccessToken token = new DefaultOAuth2AccessToken(UUID.randomUUID().toString());
+																						      																																																    																											          																																						  token.setRefreshToken(refreshToken);
+																						      																																																    																											          																																						  token.setScope(authentication.getOAuth2Request().getScope());
+																						      																																																    																											          																																						  return TokenEnhancerChain.enhance(token, authentication) => return JwtAccessTokenConverter.enhance(token, authentication)  => JwtAccessTokenConverter setta il valore di value che e' il JWT signed token !!
+																						      																																																    																											          																																						  																	 															 DefaultOAuth2AccessToken result = new DefaultOAuth2AccessToken(token);
+																						      																																																    																											          																																						  																	 															 result.setValue(encode(result, authentication)) => JwtAccessTokenConverter.encode(result, authentication) => Map converted_token = DefaultAccessTokenConverter.convertAccessToken(accessToken, authentication) => Map<String, Object> response = new HashMap<String, Object>();
+																						      																																																    																											          																																						  																	 															 																																																			       response.put("user_name",authentication.getPrincipal().getName())
+																						      																																																    																											          																																						  																	 															 																																																			       response.put("authorities",authentication.getAuthorities())
+																						      																																																    																											          																																						  																	 															 																																																			       response.put("scope",accessToken.getScope())
+																						      																																																    																											          																																						  																	 															 																																																			       response.put("jti",accessToken.getAdditionalInformation().get(JTI))
+																						      																																																    																											          																																						  																	 															 																																																			       response.put("exp",accessToken.getExpiration().getTime() / 1000)
+																						      																																																    																											          																																						  																	 															 																																																			       response.put("client_id", authentication.getOAuth2Request().getClientId())
+																						      																																																    																											          																																						  																	 															 																											String content = Jackson2JsonParser.formatMap(converted_token)		
+																						      																																																    																											          																																						  																	 															 																											Jwt token = JwtHelper.encode(content, MacSigner)
+																						      																																																    																											          																																						  																	 															 																											return token.getEncoded()																					       
+																						      																																																    																											          																																						  																	 															 
+																						      																																																    																											          																																						  																	 															 
+																						      																																																    																											          																																						  																	 															 
+																						      																																																    																											          																																						  																	 															 																											  
+																						      																																																    																											          															
+																						      																																																    																											                                  											    JwtTokenStore.storeAccessToken(accessToken, oAuth2Authentication);
+																						      																																																    																											                                  											    return  oAuth2AccessToken
+																						      																																																    																											          
+																	   																																																		return OAuth2AccessToken          
+
+        															  TokenEndpoint.getResponse(oAuth2AccessToken)  [risposta inviata al client con oAuth2AccessToken nel body in json]
+
+Il client che vuole invocare una risorsa protetta da OAuth dovra' includere tale token come Authorization header nella request.
+Vedi applicatio.yml "security:oauth2:"  e @EnableResourceServer in Application.java in licensing-service_chapter7 e organization-service_chapter7
 
 
 
