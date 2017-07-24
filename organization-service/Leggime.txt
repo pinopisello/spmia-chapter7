@@ -1,3 +1,116 @@
+Esempio organization service con token JWT , non con semplice bearer...
+
+
+
+#################  Esempio invocazione #########################
+http://localhost:8080/v1/organizations/e254f8c-c442-4ebe-a82a-e2fc1d1ff78a
+
+1) Invoco POST http://localhost:8083/auth/oauth/token per ottenere Bearer token.
+Ricordo di passare:
+  a)Header   Basic ZWFnbGVleWU6dGhpc2lzc2VjcmV0 []
+  b)passo nel body POST grant_type=password&scope=webclient&username=john.carnell&password=password1
+
+Ottengo "access_token": "yyz"
+
+2)Invoco http://localhost:8080/v1/organizations/e254f8c-c442-4ebe-a82a-e2fc1d1ff78a
+
+Aggiungo header : Bearer xyz 
+
+
+	ApplicationFilterChain.doFilter() => ApplicationFilterChain.internalDoFilter() => DelegatingFilterProxyRegistrationBean.doFilter() => FilterChainProxy.doFilter() => FilterChainProxy.doFilterInternal() => FilterChainProxy$VirtualFilterChain.doFilter() =>OAuth2AuthenticationProcessingFilter.doFilter() => PreAuthenticatedAuthenticationToken authentication = tokenExtractor.extract(request); authentication.principal contiene il bearer token inviato dal client 
+																																																																													OAuth2Authentication auth =OAuth2AuthenticationManager.authenticate(authentication) =>  String token = (String) authentication.getPrincipal(); il token "xyz"																    token="xyz"
+																																																																																																			OAuth2Authentication auth =DefaultTokenServices.loadAuthentication(token)=> OAuth2AccessToken accessToken =  JwtTokenStore.readAccessToken(token) =>  OAuth2AccessToken accessToken = JwtTokenStore.convertAccessToken(token) => JwtAccessTokenConverter.decode(token) => Jwt jwt = JwtHelper.decodeAndVerify(token, MacSigner(HMACSHA256)) => Jwt jwt = decode(token) Ritorna Jwt.claims
+																																																																																																			
+																																																																																																			
+																																																																																																			
+																																																																																																			
+																																																																																																			           Map<String, Object> map = UserInfoTokenServices.getMap() => ResponseEntity = OAuth2RestTemplate.getForEntity(path, Map.class) => OAuth2RestTemplate.execute() => RestTemplate.doExecute() => ClientHttpResponse response = AbstractBufferingClientHttpRequest.executeInternal() 
+																																																																																																																																																		                                         Qui parte la request verso http://localhost:8083/auth/user con Berarer token per ripescare da OAuth server i dettagli user (ammesso che il bearer sia valido...)
+																																																																																																																																													        												 return RestTemplate$ResponseEntityResponseExtractor.extractData(response) => return new ResponseEntity<T>(body, response.getHeaders(), response.getStatusCode());
+																																																																																																																		   return ResponseEntity.getBody()																														                                         
+																																																																																																																																																		                                         
+																																																																																																			   return UserInfoTokenServices.extractAuthentication(map) => List<GrantedAuthority> authorities = FixedAuthoritiesExtractor.extractAuthorities(map)	Estrare dalla response da http://localhost:8083/auth/user l array "authorities"																																													                                         
+																																																																																																																   Object principal = getPrincipal(map);    												        Estrare dalla response da http://localhost:8083/auth/user l oggetto "user"																																													                                      
+																																																																																																																   OAuth2Request request = new OAuth2Request(null, this.clientId, null, true, null,null, null, null, null);
+																																																																																																																   UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(principal, "N/A", authorities);
+																																																																																																																   token.setDetails(map);
+																																																																																																																   return new OAuth2Authentication(request, token);
+																																																																																																																   
+																																																																																									     return auth	
+																																																																																									     
+																																																																													Se 	OAuth2AuthenticationManager.authenticate() throws OAuth2Exception, 	un 401 e' inviato con 	"error": "invalid_token"
+																																																																													Se 	authenticate ha successo , vuol dire che auth server ha riconosciuto il bearer ed inviato info user, ma occorre ancora verificare target endpoint e' permesso!!	
+																																																																																									   																																	                                         
+																																																																												    DefaultAuthenticationEventPublisher.publishAuthenticationSuccess(auth);	
+																																																																												    SecurityContextImpl.setAuthentication(authResult);				         Quindi risutati authenticazione sono storati in SecurityContextImpl.authentication!!	
+																																																																												       																		 Per capire se la req e' permessa o no i risultati vanno confrontati con cio' che e' settato in	com.thoughtmechanix.organization.security.ResourceServerConfiguration.configure()!!																																					 								                                          
+
+
+																																																																	FilterSecurityInterceptor.doFilter() => 	FilterInvocation fi = new FilterInvocation(request, response, chain);
+																																																																											    FilterSecurityInterceptor.invoke(fi) =>   InterceptorStatusToken token = super.beforeInvocation(fi) => AbstractSecurityInterceptor.beforeInvocation(fi)	=> Collection<ConfigAttribute> attributes = FilterSecurityInterceptor.obtainSecurityMetadataSource().getAttributes(FilterInvocation) => HttpServletRequest request = ((FilterInvocation) object).getRequest();    	
+																																																																											    																																																																		   Scansiona le keys di  FilterSecurityInterceptor.securityMetadataSource.requestMap e ritorna la prima che matcha request!!
+																																																																											    																																																																		   Ritorna il relativo value ConfigAttribute
+																																																																											    																																						   Authentication authenticated = authenticateIfRequired();
+																																																																											    																																						   AffirmativeBased.decide(authenticated, FilterInvocation, attributes) =>for (AccessDecisionVoter voter : AffirmativeBased.secisionVoters)    E' qui che le regole di auth (attributes) , la request (FilterInvocation) e i dati authentication da OAuth server vengono comparate per decidere se far passare req verso endpoint o no!!
+																																																																											    																																						   																				int result = WebExpressionVoter.vote(authenticated, FilterInvocation, attributes) =>    WebExpressionConfigAttribute weca = findConfigAttribute(attributes)                                Ritorna primo attribute che e' instanza WebExpressionConfigAttribute.weca  deriva da ResourceServerConfiguration.configure!!
+																																																																															    																																						   																																						EvaluationContext ctx = expressionHandler.createEvaluationContext(authenticated,FilterInvocation); ctx deriva da request (FilterInvocation) e da OAuth2 server(authenticateds)
+																																																																															    																																						   																																						boolean pass = ExpressionUtils.evaluateAsBoolean(weca.getAuthorizeExpression(), ctx)               Qui request, config e authorization si confrontano!!
+																																																																															    																																						   																																						return pass
+																																																																															    																																						   																Se result e' 1, la request prosegue verso controller.
+																																																																															    																																						   																altrimenti eccezzione e response e' 401!!
+																																																																															    																																						   																
+																																																																															    																																						   																
+Tutto dipende dal risultato boolean pass = ExpressionUtils.evaluateAsBoolean(weca.getAuthorizeExpression(), ctx) => ((Boolean) expr.getValue(ctx, Boolean.class)).booleanValue()
+
+
+weca.getAuthorizeExpression()	 e' SpelExpression
+ctx e' StandardEvaluationContext
+
+https://docs.spring.io/spring/docs/current/spring-framework-reference/html/expressions.html
+
+Una SpelExpression funziona usando construtti/variabili definiti in un context.
+
+Nel caso in questione :
+
+    	 http
+        .authorizeRequests()
+          .antMatchers(HttpMethod.DELETE, "/v1/organizations/**")
+          .hasRole("ADMIN")
+          .anyRequest()
+          .authenticated();
+          
+Genera due entries in FilterSecurityInterceptor.securityMetadataSource.requestMap:
+
+   key																value(WebExpressionConfigAttribute)
+1)AntPathRequestMatcher[pattern='/v1/organizations/**', DELETE] => [#oauth2.throwOnError(hasRole('ROLE_ADMIN'))]
+
+2)AnyRequestMatcher												=> [#oauth2.throwOnError(authenticated)]
+
+
+Queste vengolo comparate con request in FilterSecurityInterceptor.obtainSecurityMetadataSource().getAttributes(FilterInvocation) in quell ordine!!
+
+Se provo ad invocare GET http://localhost:8080/v1/organizations/e254f8c-c442-4ebe-a82a-e2fc1d1ff78a con bearer ottenuto da john.carnell , la seconda regolaviene matchata e la req passa.
+Se riperto con DELETE fallisce perche carnell NON E' ADMIN, e' ROLE_USER.
+Se cambio ROLE in ADMIN in auth server, la delete funziona!!
+
+Ma che oggetto ha metodo hasRole()?
+Chi e' #oauth2.throwOnError??
+
+In WebExpressionVoter.vote()
+EvaluationContext ctx = OAuth2WebSecurityExpressionHandler.createEvaluationContext(authentication,fi); =>   WebSecurityExpressionRoot root = createSecurityExpressionRoot(authentication,invocation);
+																											StandardEvaluationContext ctx = OAuth2WebSecurityExpressionHandler.createEvaluationContextInternal(authentication,invocation) => 	StandardEvaluationContext ec = super.createEvaluationContextInternal(authentication, invocation);
+																																																												ec.setVariable("oauth2", new OAuth2SecurityExpressionMethods(authentication));
+																																																												return ec;
+																											ctx.setRootObject(root);
+																											return ctx;
+Quindi hasRole() appartiene a WebSecurityExpressionRoot!!Quello e' il root object del context.
+Inoltre, vedi su, OAuth2SecurityExpressionMethods e' linkato oggetto chiamato "oauth2".
+
+Nell esecuzione SpelExpression hasRole() viene eseguito e il result viene passato a OAuth2SecurityExpressionMethods.throwOnError()!!
+
+Il risultato e' passato a AffirmativeBased.vote() che decide se throw una exception o permetterre alla request di raggiundere il controller target.
+
+
 
 
 
