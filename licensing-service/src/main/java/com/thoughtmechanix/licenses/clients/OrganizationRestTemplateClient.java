@@ -22,7 +22,7 @@ public class OrganizationRestTemplateClient {
 
         ResponseEntity<Organization> restExchange =
                 restTemplate.exchange(
-                        "http://zuulserver:5555/api/organization/v1/organizations/{organizationId}",
+                        "http://organizationservice/v1/organizations/{organizationId}",
                         HttpMethod.GET,
                         null, Organization.class, organizationId);
 

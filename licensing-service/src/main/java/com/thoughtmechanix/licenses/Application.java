@@ -29,6 +29,7 @@ public class Application {
     private ServiceConfig serviceConfig;
     private static final Logger logger = LoggerFactory.getLogger(Application.class);
 
+    @LoadBalanced         //Inietta RestTemplate  in  OrganizationRestTemplateClient configurando un LoadBalancerInterceptor 
     @Primary
     @Bean
     public RestTemplate getCustomRestTemplate() {

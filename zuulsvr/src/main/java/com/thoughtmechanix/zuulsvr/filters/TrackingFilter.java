@@ -4,7 +4,15 @@ import com.netflix.zuul.ZuulFilter;
 import com.netflix.zuul.context.RequestContext;
 import com.thoughtmechanix.zuulsvr.config.ServiceConfig;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.Jws;
+import io.jsonwebtoken.Jwt;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.SignatureException;
+import io.jsonwebtoken.impl.DefaultClaims;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,10 +65,15 @@ public class TrackingFilter extends ZuulFilter{
 
             String authToken = filterUtils.getAuthToken().replace("Bearer ","");
             try {
-                Claims claims = Jwts.parser()
-                        .setSigningKey(serviceConfig.getJwtSigningKey().getBytes("UTF-8"))
-                        .parseClaimsJws(authToken).getBody();
-                result = (String) claims.get("organizationId");
+            	byte[] signing_key = serviceConfig.getJwtSigningKey().getBytes("UTF-8");//proveniente da zuulservice-prod.yml
+            	JwtParser parser = Jwts.parser();
+            	parser.setSigningKey(signing_key);
+            	//parser.parseClaimsJws(authToken);
+            	Jwt jwt_token = parser.parse(authToken);//throws ExpiredJwtException, MalformedJwtException, SignatureException, IllegalArgumentException;
+            	DefaultClaims body = (DefaultClaims)jwt_token.getBody();
+            	String orgid = body.get("organizationId", String.class);
+            	result =orgid;
+                //result = (String) claims.get("organizationId");
             }
             catch (Exception e){
                 e.printStackTrace();
@@ -80,9 +93,9 @@ public class TrackingFilter extends ZuulFilter{
             filterUtils.setCorrelationId(generateCorrelationId());
             logger.debug("tmx-correlation-id generated in tracking filter: {}.", filterUtils.getCorrelationId());
         }
-
-        System.out.println("The organization id from the token is : " + getOrganizationId());
-        filterUtils.setOrgId(getOrganizationId());
+        String orgid =  getOrganizationId();
+        System.out.println("The organization id from the token is : " +orgid);
+        filterUtils.setOrgId(orgid);
         logger.debug("Processing incoming request for {}.",  ctx.getRequest().getRequestURI());
         return null;
     }

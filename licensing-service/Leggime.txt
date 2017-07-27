@@ -1,0 +1,16 @@
+Esempio licensing service con token JWT , non con semplice bearer e con in piu la capacita di passare in JWT token
+agli endpoints da cui dipende .
+
+http://localhost:8081/licensingservice/v1/organizations/442adb6e-fa58-47f3-9ca2-ed1fecdfe86c/licenses/08dbe05-606e-4dad-9d33-90ef10e334f9
+
+dipende da http://localhost:8080/v1/organizations/e254f8c-c442-4ebe-a82a-e2fc1d1ff78a
+
+Occorre passare Bearer passato dal client altrimenti questa chiamata fallira' come 401!!
+
+UserContextFilter.java  estrae header "Authorization" dalla request in ingresso e lo salva in UserContextHolder.getContext()
+
+UserContextInterceptor.java viene  aggiunto agli interceptors del RestTemplate usato da OrganizationRestTemplateClient .
+
+UserContextInterceptor.intercept() estrae  UserContextHolder.getContext()  "Authorization" header e lo aggiunge alla request in uscita verso organization server.
+
+Per verificare, commenta linea aggiunta header in UserContextInterceptor.intercept() e vedi come tae chiamata fallisce.

@@ -76,9 +76,9 @@ public class LicenseService {
                      @HystrixProperty(name="metrics.rollingStats.numBuckets", value="5")}
     )
     public List<License> getLicensesByOrg(String organizationId){
-        randomlyRunLong();
-
-        return licenseRepository.findByOrganizationId(organizationId);
+        //randomlyRunLong();
+    	List<License> licenses =  licenseRepository.findByOrganizationId(organizationId);
+        return licenses;
     }
 
     private List<License> buildFallbackLicenseList(String organizationId){

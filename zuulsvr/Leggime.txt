@@ -1,0 +1,25 @@
+Implementa zuul edge router con la capacita' di:
+
+1) parsare i JWT tokens in entrata 
+2) estrarre il contenuto (in particolare organizationId)
+3) validare token
+
+Si usa  <artifactId>jjwt</artifactId> per parsare e validate jwt in entrata
+
+Si testi con (ovviamente passare Authorization: Bearer auth_token):
+
+http://localhost:5555/licensingservice/v1/organizations/442adb6e-fa58-47f3-9ca2-ed1fecdfe86c/licenses/08dbe05-606e-4dad-9d33-90ef10e334f9
+
+che routa verso:
+
+http://localhost:8081/licensingservice/v1/organizations/442adb6e-fa58-47f3-9ca2-ed1fecdfe86c/licenses/08dbe05-606e-4dad-9d33-90ef10e334f9
+
+
+TrackingFilter.run() => TrackingFilter.getOrganizationId() => String authToken = FilterUtils.getAuthToken() 
+															  JwtParser parser = Jwts.parser();
+															  parser.setSigningKey(signing_key);
+															  Jwt jwt_token = parser.parse(authToken);
+															  String orgid = body.get("organizationId", String.class);
+					    FilterUtils.setOrgId(getOrganizationId()) =>   RequestContext ctx = RequestContext.getCurrentContext();
+					    											   ctx.addZuulRequestHeader("tmx-org-id",  orgId) questo aggiunge header "tmx-org-id: orgid" a tutte chiamate in uscita da zuul!          
+															  
