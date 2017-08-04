@@ -6,6 +6,7 @@ spring:
       prod
   cloud:
     config:
+      uri: http://localhost:8888
       enabled: true
 
 server:
